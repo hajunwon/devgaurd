@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.devguard"
+    namespace = "com.hajunwon.devguard"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.hajunwon.devguard"
         minSdk = 36
         targetSdk = 36
         versionCode = 1
