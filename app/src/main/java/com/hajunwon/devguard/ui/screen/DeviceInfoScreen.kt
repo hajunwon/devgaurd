@@ -1,6 +1,7 @@
 package com.hajunwon.devguard.ui.screen
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -39,8 +40,8 @@ fun DeviceInfoScreen(viewModel: SecurityViewModel) {
                 }
             }
         }
-    ) { _ ->
-        Column {
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding)) {
             TabRow(selectedTabIndex = selectedTab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(

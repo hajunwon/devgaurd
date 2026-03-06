@@ -48,13 +48,17 @@ object EmulatorDetector {
                user == "android-build" || user == "buildbot" || user == "root"
     }
 
-    private fun checkEmulatorPhoneNumber(context: Context): Boolean = try {
-        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        val number = tm.line1Number ?: return false
-        listOf("15555215554", "15555215556", "15555215558", "15555215560",
-               "15555215562", "15555215564", "15555215566", "15555215568",
-               "15555215570", "15555215572").any { number.contains(it) }
-    } catch (e: Exception) { false }
+    private fun checkEmulatorPhoneNumber(context: Context): Boolean {
+        if (context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED) return false
+        return try {
+            val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            val number = tm.line1Number ?: return false
+            listOf("15555215554", "15555215556", "15555215558", "15555215560",
+                   "15555215562", "15555215564", "15555215566", "15555215568",
+                   "15555215570", "15555215572").any { number.contains(it) }
+        } catch (e: Exception) { false }
+    }
 
     fun scan(context: Context, props: String): DetectorResult {
         val sm          = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -98,10 +102,13 @@ object EmulatorDetector {
             Signal(SignalCategory.EMULATOR, "Emulator phone number detected",             "Phone number looks normal",           3, emuPhone),
         )
 
-        val phoneNumber = try {
-            val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            tm.line1Number ?: "null"
-        } catch (e: Exception) { "unavailable" }
+        val phoneNumber = if (context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE)
+            == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try {
+                val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+                tm.line1Number ?: "null"
+            } catch (e: Exception) { "unavailable" }
+        } else "permission denied"
         val qemuLine = props.lines().firstOrNull { it.contains("ro.kernel.qemu") }?.trim()
                        ?: "[ro.kernel.qemu]: (not found)"
 
