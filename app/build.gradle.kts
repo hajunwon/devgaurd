@@ -13,10 +13,10 @@ android {
 
     defaultConfig {
         applicationId = "com.hajunwon.devguard"
-        minSdk = 36
+        minSdk = 28
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
