@@ -6,6 +6,8 @@ import android.provider.Settings
 import com.hajunwon.devguard.data.model.DetectorResult
 import com.hajunwon.devguard.data.model.Signal
 import com.hajunwon.devguard.data.model.SignalCategory
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 object DebugDetector {
@@ -20,7 +22,13 @@ object DebugDetector {
 
     private fun checkFridaPort(port: Int): Boolean = try {
         java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 50); true }
-    } catch (e: Exception) { false }
+    } catch (e: Exception) {
+        // If Xposed hook threw this to block port scan, its frames appear in the stack
+        e.stackTrace.any {
+            it.className.contains("xposed", ignoreCase = true) ||
+            it.className.contains("LSPHooker", ignoreCase = true)
+        }
+    }
 
     private fun checkFridaProcess(): Boolean = try {
         File("/proc").listFiles()
@@ -32,23 +40,30 @@ object DebugDetector {
             } ?: false
     } catch (e: Exception) { false }
 
-    fun scan(context: Context): DetectorResult {
-        // Compute all values once — used in both signals and rawData
+    suspend fun scan(context: Context): DetectorResult = coroutineScope {
+        // Launch slow I/O operations in parallel
+        val frida42Deferred   = async { checkFridaPort(27042) }
+        val frida43Deferred   = async { checkFridaPort(27043) }
+        val fridaProcDeferred = async { checkFridaProcess() }
+
+        // Non-blocking checks run while ports are being probed
         val debuggerAttached = Debug.isDebuggerConnected()
         val tracerPid  = readTracerPid()
         val usbDebug   = Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
         val devOpts    = Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
         @Suppress("DEPRECATION")
         val mockLoc    = Settings.Secure.getInt(context.contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION, 0) == 1
-        val frida42    = checkFridaPort(27042)
-        val frida43    = checkFridaPort(27043)
-        val fridaProc  = checkFridaProcess()
         val proxyHost  = System.getProperty("http.proxyHost") ?: ""
         val proxyPort  = System.getProperty("http.proxyPort") ?: ""
         val proxy      = proxyHost.isNotEmpty() && proxyPort.isNotEmpty()
         val a11y       = Settings.Secure.getString(
             context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         )?.isNotEmpty() == true
+
+        // Await parallel results
+        val frida42   = frida42Deferred.await()
+        val frida43   = frida43Deferred.await()
+        val fridaProc = fridaProcDeferred.await()
 
         val signals = listOf(
             Signal(SignalCategory.DEBUG, "Debugger attached (isDebuggerConnected)",  "No debugger attached",       4, debuggerAttached),
@@ -81,6 +96,6 @@ object DebugDetector {
         ).joinToString("\n") { "${it.first}: ${it.second}" } +
             "\n\n=== /proc/self/status (TracerPid) ===\n$tracerLine"
 
-        return DetectorResult(signals, rawData)
+        DetectorResult(signals, rawData)
     }
 }

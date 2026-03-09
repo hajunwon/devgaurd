@@ -8,6 +8,8 @@ import com.hajunwon.devguard.data.detector.IntegrityDetector
 import com.hajunwon.devguard.data.detector.RootDetector
 import com.hajunwon.devguard.data.model.RiskLevel
 import com.hajunwon.devguard.data.model.Signal
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 data class FullScanResult(
     val signals: List<Signal>,
@@ -21,14 +23,21 @@ data class FullScanResult(
 
 object SecurityAnalyzer {
 
-    fun fullScan(context: Context, props: String): FullScanResult {
-        val emulator  = EmulatorDetector.scan(context, props)
-        val root      = RootDetector.scan(props)
-        val debug     = DebugDetector.scan(context)
-        val integrity = IntegrityDetector.scan(context)
-        val signals   = emulator.signals + root.signals + debug.signals + integrity.signals
-        val score     = calculateScore(signals)
-        return FullScanResult(
+    suspend fun fullScan(context: Context, props: String): FullScanResult = coroutineScope {
+        // Run all 4 detectors in parallel
+        val emulatorDeferred  = async { EmulatorDetector.scan(context, props) }
+        val rootDeferred      = async { RootDetector.scan(props) }
+        val debugDeferred     = async { DebugDetector.scan(context) }
+        val integrityDeferred = async { IntegrityDetector.scan(context) }
+
+        val emulator  = emulatorDeferred.await()
+        val root      = rootDeferred.await()
+        val debug     = debugDeferred.await()
+        val integrity = integrityDeferred.await()
+
+        val signals = emulator.signals + root.signals + debug.signals + integrity.signals
+        val score   = calculateScore(signals)
+        FullScanResult(
             signals      = signals,
             score        = score,
             riskLevel    = getRiskLevel(score),

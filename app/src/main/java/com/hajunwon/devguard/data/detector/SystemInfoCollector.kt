@@ -4,11 +4,13 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.hardware.camera2.CameraManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -129,12 +131,60 @@ object SystemInfoCollector {
 
     fun identifiers(context: Context): String {
         val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val hasPhone = context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) ==
+                PackageManager.PERMISSION_GRANTED
+
+        fun phoneField(block: () -> String?): String {
+            if (!hasPhone) return "Permission denied (READ_PHONE_STATE)"
+            return try { block() ?: "null" }
+                   catch (e: SecurityException) { "Restricted (Android 10+ blocks non-system apps)" }
+                   catch (e: Exception) { "Error: ${e.message}" }
+        }
+
+        val imei1 = phoneField {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) tm.getImei(0)
+            else @Suppress("DEPRECATION") tm.deviceId
+        }
+        val imei2 = phoneField {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) tm.getImei(1)
+            else "N/A (< Android 8)"
+        }
+        val meid = phoneField {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) tm.getMeid(0)
+            else "N/A (< Android 8)"
+        }
+        val serial = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (hasPhone) Build.getSerial() else "Permission denied (READ_PHONE_STATE)"
+            } else @Suppress("DEPRECATION") Build.SERIAL
+        } catch (e: Exception) { "Error: ${e.message}" }
+
+        val simSerial = phoneField { tm.simSerialNumber }
+        val phoneNumber = phoneField { tm.line1Number?.ifEmpty { "(empty)" } }
+
+        val gsfId = try {
+            val uri = Uri.parse("content://com.google.android.gsf.gservices")
+            context.contentResolver.query(uri, null, null, arrayOf("android_id"), null)?.use { c ->
+                if (c.moveToFirst() && c.columnCount >= 2)
+                    java.lang.Long.toHexString(c.getString(1).toLong())
+                else "N/A"
+            } ?: "N/A"
+        } catch (e: Exception) { "N/A" }
+
         return listOf(
-            "Android ID" to (androidId ?: "null"),
-            "Board"      to Build.BOARD,
-            "Bootloader" to Build.BOOTLOADER,
-            "Host"       to Build.HOST,
-            "User"       to Build.USER
+            "Android ID"         to (androidId ?: "null"),
+            "IMEI 1"             to imei1,
+            "IMEI 2"             to imei2,
+            "MEID"               to meid,
+            "Serial"             to serial,
+            "SIM Serial (ICCID)" to simSerial,
+            "Phone Number"       to phoneNumber,
+            "GSF Android ID"     to gsfId,
+            "Board"              to Build.BOARD,
+            "Bootloader"         to Build.BOOTLOADER,
+            "Host"               to Build.HOST,
+            "User"               to Build.USER,
         ).joinToString("\n") { "${it.first}: ${it.second}" }
     }
 

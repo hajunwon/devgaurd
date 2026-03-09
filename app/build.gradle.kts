@@ -15,15 +15,16 @@ android {
         applicationId = "com.hajunwon.devguard"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
