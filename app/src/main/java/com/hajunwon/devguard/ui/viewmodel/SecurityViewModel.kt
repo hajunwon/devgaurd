@@ -62,15 +62,19 @@ class SecurityViewModel(application: Application) : AndroidViewModel(application
 
             // Run security scan and all system info collection in parallel
             // props collection is async to avoid blocking the entire coroutine if getprop hangs
-            val propsDeferred       = async { withTimeoutOrNull(3_000) { runCatching { SystemInfoCollector.systemProperties() }.getOrDefault("") } ?: "getprop timed out" }
+            // runInterruptible makes the timeout effective for the blocking getprop process read
+            val propsDeferred       = async { withTimeoutOrNull(3_000) { kotlinx.coroutines.runInterruptible { runCatching { SystemInfoCollector.systemProperties() }.getOrDefault("") } } ?: "getprop timed out" }
             val batteryDeferred     = async { runCatching { SystemInfoCollector.batteryPercent(context) }.getOrDefault(-1) }
             val buildDeferred       = async { sysInfo { SystemInfoCollector.buildInfo() } }
             val displayDeferred     = async { sysInfo { SystemInfoCollector.displayInfo(context) } }
             val hardwareDeferred    = async { sysInfo { SystemInfoCollector.hardwareInfo(context) } }
             val batteryRawDeferred  = async { sysInfo { SystemInfoCollector.batteryRaw(context) } }
             val sensorDeferred      = async { sysInfo { SystemInfoCollector.sensorDetails(context) } }
-            val networkDeferred     = async { sysInfo { SystemInfoCollector.networkInfo(context) } }
-            val identifiersDeferred = async { sysInfo { SystemInfoCollector.identifiers(context) } }
+            // networkInfo / identifiers use TelephonyManager & ContentProvider (Binder IPC) which
+            // can block indefinitely if the remote service is unresponsive — use runInterruptible
+            // so the timeout can actually interrupt the blocking thread.
+            val networkDeferred     = async { withTimeoutOrNull(5_000) { kotlinx.coroutines.runInterruptible { sysInfo { SystemInfoCollector.networkInfo(context) } } } ?: "Timed out" }
+            val identifiersDeferred = async { withTimeoutOrNull(5_000) { kotlinx.coroutines.runInterruptible { sysInfo { SystemInfoCollector.identifiers(context) } } } ?: "Timed out" }
             val procDeferred        = async { sysInfo { SystemInfoCollector.procInfo() } }
 
             val props = propsDeferred.await()
@@ -79,28 +83,35 @@ class SecurityViewModel(application: Application) : AndroidViewModel(application
             // 15 second global timeout for the full scan
             val scan = withTimeoutOrNull(15_000) { scanDeferred.await() }
 
-            _uiState.value = SecurityUiState(
-                signals        = scan?.signals          ?: emptyList(),
-                score          = scan?.score            ?: 0,
-                maxScore       = scan?.maxPossibleScore ?: 0,
-                riskLevel      = scan?.riskLevel        ?: RiskLevel("ERROR", "Scan failed", 0xFFFF0000),
-                batteryPercent = batteryDeferred.await(),
-                isLoading      = false,
-                scanTime       = System.currentTimeMillis(),
-                props          = props,
-                emulatorRaw    = scan?.emulatorRaw  ?: "Scan failed",
-                rootRaw        = scan?.rootRaw      ?: "Scan failed",
-                debugRaw       = scan?.debugRaw     ?: "Scan failed",
-                integrityRaw   = scan?.integrityRaw ?: "Scan failed",
-                buildInfo      = buildDeferred.await(),
-                displayInfo    = displayDeferred.await(),
-                hardwareInfo   = hardwareDeferred.await(),
-                batteryRaw     = batteryRawDeferred.await(),
-                sensorInfo     = sensorDeferred.await(),
-                networkInfo    = networkDeferred.await(),
-                identifiers    = identifiersDeferred.await(),
-                procInfo       = procDeferred.await(),
-            )
+            try {
+                _uiState.value = SecurityUiState(
+                    signals        = scan?.signals          ?: emptyList(),
+                    score          = scan?.score            ?: 0,
+                    maxScore       = scan?.maxPossibleScore ?: 0,
+                    riskLevel      = scan?.riskLevel        ?: RiskLevel("ERROR", "Scan failed", 0xFFFF0000),
+                    batteryPercent = batteryDeferred.await(),
+                    isLoading      = false,
+                    scanTime       = System.currentTimeMillis(),
+                    props          = props,
+                    emulatorRaw    = scan?.emulatorRaw  ?: "Scan failed",
+                    rootRaw        = scan?.rootRaw      ?: "Scan failed",
+                    debugRaw       = scan?.debugRaw     ?: "Scan failed",
+                    integrityRaw   = scan?.integrityRaw ?: "Scan failed",
+                    buildInfo      = buildDeferred.await(),
+                    displayInfo    = displayDeferred.await(),
+                    hardwareInfo   = hardwareDeferred.await(),
+                    batteryRaw     = batteryRawDeferred.await(),
+                    sensorInfo     = sensorDeferred.await(),
+                    networkInfo    = networkDeferred.await(),
+                    identifiers    = identifiersDeferred.await(),
+                    procInfo       = procDeferred.await(),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e  // must not swallow cancellation — let the coroutine be cancelled normally
+            } catch (e: Exception) {
+                // Safety net: ensure loading is always cleared even if an unexpected error occurs
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
         }
     }
 }
