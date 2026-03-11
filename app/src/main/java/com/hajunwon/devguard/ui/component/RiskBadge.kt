@@ -22,14 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun RiskBadge(label: String, subtitle: String, score: Int, color: Color) {
-    val maxScore = 20
+fun RiskBadge(label: String, subtitle: String, score: Int, maxScore: Int, color: Color) {
+    val safeMax = maxScore.coerceAtLeast(1)
     val animatedProgress by animateFloatAsState(
-        targetValue   = (score / maxScore.toFloat()).coerceAtMost(1f),
+        targetValue   = (score / safeMax.toFloat()).coerceIn(0f, 1f),
         animationSpec = tween(800, easing = FastOutSlowInEasing),
         label         = "riskProgress"
     )
@@ -44,7 +46,12 @@ fun RiskBadge(label: String, subtitle: String, score: Int, color: Color) {
                 .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "Risk score: $score out of $safeMax. Risk level: $label. $subtitle"
+                }
+            ) {
                 CircularProgressIndicator(
                     progress    = { animatedProgress },
                     modifier    = Modifier.size(120.dp),
@@ -61,7 +68,7 @@ fun RiskBadge(label: String, subtitle: String, score: Int, color: Color) {
                         color      = color
                     )
                     Text(
-                        text  = "/ $maxScore",
+                        text  = "/ $safeMax",
                         style = MaterialTheme.typography.bodySmall,
                         color = color.copy(alpha = 0.5f)
                     )

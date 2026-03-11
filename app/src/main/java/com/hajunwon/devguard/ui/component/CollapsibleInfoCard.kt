@@ -11,7 +11,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -52,11 +57,37 @@ fun CollapsibleInfoCard(title: String, content: String) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodySmall,
+                    text  = buildColorizedAnnotatedString(content),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun buildColorizedAnnotatedString(content: String) = buildAnnotatedString {
+    val alertColor   = Color(0xFFEF9A9A)  // soft red for findings
+    val safeColor    = Color(0xFF81C784)  // soft green for clean results
+    val sectionColor = Color(0xFF90CAF9)  // soft blue for section headers
+
+    content.lines().forEachIndexed { index, line ->
+        val color = when {
+            line.startsWith("===")                                  -> sectionColor
+            line.contains("EXISTS",    ignoreCase = true) ||
+            line.contains("DETECTED",  ignoreCase = true) ||
+            line.contains(": true")                                 -> alertColor
+            line.contains("not found", ignoreCase = true) ||
+            line.contains(": false")   ||
+            line.contains("(nothing suspicious)")                   -> safeColor
+            else                                                    -> null
+        }
+        if (color != null) {
+            withStyle(SpanStyle(color = color)) { append(line) }
+        } else {
+            append(line)
+        }
+        if (index < content.lines().lastIndex) append("\n")
     }
 }

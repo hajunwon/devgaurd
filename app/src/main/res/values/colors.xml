@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Risk level colors — mirrors SecurityColors.kt -->
+    <color name="risk_compromised">#FFB71C1C</color>
+    <color name="risk_emulator">#FFEF5350</color>
+    <color name="risk_high">#FFFF5722</color>
+    <color name="risk_suspicious">#FFFF9800</color>
+    <color name="risk_low">#FFFFC107</color>
+    <color name="risk_clean">#FF4CAF50</color>
+
+    <!-- Detection category accent colors -->
+    <color name="category_emulator">#FFEF5350</color>
+    <color name="category_root">#FFFF5722</color>
+    <color name="category_debug">#FFFF9800</color>
+    <color name="category_integrity">#FF9C27B0</color>
 </resources>

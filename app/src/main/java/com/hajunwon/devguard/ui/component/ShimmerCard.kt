@@ -21,24 +21,33 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+/**
+ * @param translateX Pass a shared animated value from the parent to synchronize
+ *   shimmer phase across multiple cards. If null, creates its own animation.
+ */
 @Composable
-fun ShimmerCard(modifier: Modifier = Modifier, height: Dp = 80.dp) {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateX by transition.animateFloat(
-        initialValue = -600f,
-        targetValue  =  600f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerX"
-    )
+fun ShimmerCard(modifier: Modifier = Modifier, height: Dp = 80.dp, translateX: Float? = null) {
+    val resolvedTranslateX = if (translateX != null) {
+        translateX
+    } else {
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val x by transition.animateFloat(
+            initialValue  = -600f,
+            targetValue   =  600f,
+            animationSpec = infiniteRepeatable(
+                animation  = tween(1000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmerX"
+        )
+        x
+    }
     val base      = MaterialTheme.colorScheme.surfaceVariant
     val highlight = MaterialTheme.colorScheme.surface
     val brush = Brush.linearGradient(
         colors = listOf(base, highlight, base),
-        start  = Offset(translateX, 0f),
-        end    = Offset(translateX + 600f, 0f)
+        start  = Offset(resolvedTranslateX, 0f),
+        end    = Offset(resolvedTranslateX + 600f, 0f)
     )
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),

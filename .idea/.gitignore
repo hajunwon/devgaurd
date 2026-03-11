@@ -1,3 +1,14 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+
+# User-specific device & deployment state
+/deploymentTargetSelector.xml
+/deviceManager.xml
+/assetWizardSettings.xml
+
+# Build/index caches
+/caches/
+
+# Android Studio test results
+/androidTestResults/

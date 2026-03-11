@@ -2,19 +2,30 @@
 .gradle/
 build/
 
-# Local config
+# Local configuration (machine-specific, never commit)
 local.properties
 
-# IDE
-.idea/
+# IDE — per-file exclusions managed in .idea/.gitignore
 *.iml
 
-# Mac
-.DS_Store
-
-# NDK
+# NDK build artifacts
 .externalNativeBuild/
 .cxx/
+obj/
 
-# Android captures
+# Android packaging artifacts
 captures/
+*.ap_
+*.aab
+
+# Release signing keys — NEVER commit these
+*.jks
+*.keystore
+keystore/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Git merge artifacts
+*.orig
